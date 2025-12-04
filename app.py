@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
 from datetime import datetime
 
 st.set_page_config(page_title="EDELWEISS Termin-Analyse", layout="wide")
@@ -110,106 +109,55 @@ if uploaded_file is not None:
         
         st.markdown("---")
         
-        # --- SANKEY DIAGRAM ---
-        st.markdown("## 🌊 Customer Journey (Sankey)")
+        # --- DETAIL TABELLEN PRO MITARBEITERIN ---
+        st.markdown("## 📋 Detail-Tabellen pro Mitarbeiterin")
         
-        # Sankey-Daten vorbereiten
-        # Von "Termin vereinbart" zu allen möglichen ersten Folge-Kontakten
-        sankey_data = []
+        # Download Button für alle Daten ganz oben
+        all_data_csv = results_df.copy()
+        all_data_csv['Termin Datum'] = all_data_csv['Termin Datum'].dt.strftime('%Y-%m-%d %H:%M')
         
-        for _, row in results_df.iterrows():
-            folge_liste = row['Folge-Kontakte'].split(' → ')
-            
-            # Erste Verbindung: Termin Art → Erster Folge-Kontakt
-            if folge_liste[0] != 'Kein weiterer Kontakt':
-                sankey_data.append({
-                    'von': row['Termin Art'],
-                    'zu': folge_liste[0],
-                    'wert': 1
-                })
-                
-                # Weitere Verbindungen in der Chain
-                for i in range(len(folge_liste) - 1):
-                    sankey_data.append({
-                        'von': folge_liste[i],
-                        'zu': folge_liste[i+1],
-                        'wert': 1
-                    })
-            else:
-                # Keine Folge-Kontakte
-                sankey_data.append({
-                    'von': row['Termin Art'],
-                    'zu': 'Kein weiterer Kontakt',
-                    'wert': 1
-                })
-        
-        # Aggregieren
-        sankey_df = pd.DataFrame(sankey_data)
-        sankey_agg = sankey_df.groupby(['von', 'zu'])['wert'].sum().reset_index()
-        
-        # Nur die Top-Flows zeigen (sonst wird's zu komplex)
-        top_flows = sankey_agg.nlargest(30, 'wert')
-        
-        # Nodes erstellen
-        alle_nodes = pd.concat([top_flows['von'], top_flows['zu']]).unique().tolist()
-        node_dict = {node: idx for idx, node in enumerate(alle_nodes)}
-        
-        # Sankey Figure
-        fig = go.Figure(data=[go.Sankey(
-            node=dict(
-                pad=15,
-                thickness=20,
-                line=dict(color="black", width=0.5),
-                label=alle_nodes,
-                color=['#1f77b4' if 'Termin' in n else '#ff7f0e' if 'Auftrag' in n else '#2ca02c' if 'Verkaufsgespräch' in n else '#d62728' for n in alle_nodes]
-            ),
-            link=dict(
-                source=[node_dict[x] for x in top_flows['von']],
-                target=[node_dict[x] for x in top_flows['zu']],
-                value=top_flows['wert'].tolist(),
-                color='rgba(0,0,0,0.2)'
-            )
-        )])
-        
-        fig.update_layout(
-            title="Customer Journey Flow (Top 30 Verbindungen)",
-            font=dict(size=10),
-            height=600
+        st.download_button(
+            label="📥 Gesamte Tabelle als CSV downloaden",
+            data=all_data_csv.to_csv(index=False).encode('utf-8'),
+            file_name=f'termin_analyse_gesamt_{datetime.now().strftime("%Y%m%d")}.csv',
+            mime='text/csv'
         )
-        
-        st.plotly_chart(fig, use_container_width=True)
         
         st.markdown("---")
         
-        # --- DETAIL TABELLE ---
-        st.markdown("## 📋 Detail-Tabelle")
+        # Sortiert nach Anzahl Termine (Top Performer zuerst)
+        mitarbeiterinnen_sorted = results_df['Mitarbeiterin'].value_counts().index.tolist()
         
-        # Filter nach Mitarbeiterin
-        mitarbeiterinnen = ['Alle'] + sorted(results_df['Mitarbeiterin'].unique().tolist())
-        selected_ma = st.selectbox("Mitarbeiterin filtern", mitarbeiterinnen)
-        
-        if selected_ma != 'Alle':
-            filtered_df = results_df[results_df['Mitarbeiterin'] == selected_ma]
-        else:
-            filtered_df = results_df
-        
-        # Sortierbar machen
-        filtered_df_display = filtered_df.copy()
-        filtered_df_display['Termin Datum'] = filtered_df_display['Termin Datum'].dt.strftime('%Y-%m-%d %H:%M')
-        
-        st.dataframe(
-            filtered_df_display[['Mitarbeiterin', 'Kunde', 'Termin Datum', 'Termin Art', 'Folge-Kontakte', 'Letzter Status']],
-            hide_index=True,
-            use_container_width=True
-        )
-        
-        # Download
-        st.download_button(
-            label="📥 Tabelle als CSV downloaden",
-            data=filtered_df.to_csv(index=False).encode('utf-8'),
-            file_name=f'termin_analyse_{datetime.now().strftime("%Y%m%d")}.csv',
-            mime='text/csv'
-        )
+        for mitarbeiterin in mitarbeiterinnen_sorted:
+            ma_df = results_df[results_df['Mitarbeiterin'] == mitarbeiterin].copy()
+            
+            # Statistiken für diese Mitarbeiterin
+            anzahl_termine = len(ma_df)
+            mit_folge = len(ma_df[ma_df['Letzter Status'] != 'Kein weiterer Kontakt'])
+            auftraege = len(ma_df[ma_df['Letzter Status'].str.contains('Auftrag', na=False, case=False)])
+            
+            # Expander für jede Mitarbeiterin
+            with st.expander(f"**{mitarbeiterin}** — {anzahl_termine} Termine | {mit_folge} mit Folge-Kontakt | {auftraege} mit Auftrag", expanded=False):
+                
+                # Datum formatieren
+                ma_df_display = ma_df.copy()
+                ma_df_display['Termin Datum'] = ma_df_display['Termin Datum'].dt.strftime('%Y-%m-%d %H:%M')
+                
+                # Tabelle
+                st.dataframe(
+                    ma_df_display[['Kunde', 'Termin Datum', 'Termin Art', 'Folge-Kontakte', 'Letzter Status']],
+                    hide_index=True,
+                    use_container_width=True
+                )
+                
+                # Download für diese Mitarbeiterin
+                st.download_button(
+                    label=f"📥 {mitarbeiterin} als CSV downloaden",
+                    data=ma_df_display.to_csv(index=False).encode('utf-8'),
+                    file_name=f'termin_analyse_{mitarbeiterin}_{datetime.now().strftime("%Y%m%d")}.csv',
+                    mime='text/csv',
+                    key=f'download_{mitarbeiterin}'  # Unique key für jeden Button
+                )
 
 else:
     st.info("👆 Bitte Excel-Datei hochladen um zu starten")
