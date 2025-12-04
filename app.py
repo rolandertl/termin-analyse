@@ -40,6 +40,8 @@ if uploaded_file is not None:
             mitarbeiterin = termin_row['Mitarbeiter']
             termin_datum = termin_row['Datum/Uhrzeit']
             termin_art = termin_row['Kontaktart']
+            plz = termin_row.get('PLZ (Firma)', '')
+            ort = termin_row.get('Ort (Firma)', '')
             
             # Alle Kontakte zu diesem Kunden NACH dem Termin
             kunde_kontakte = df[
@@ -50,6 +52,12 @@ if uploaded_file is not None:
             # Folge-Kontaktarten sammeln
             folge_kontakte = kunde_kontakte['Kontaktart'].tolist()
             
+            # Datum vom letzten Kontakt
+            if len(kunde_kontakte) > 0:
+                letzter_kontakt_datum = kunde_kontakte.iloc[-1]['Datum/Uhrzeit']
+            else:
+                letzter_kontakt_datum = termin_datum  # Wenn kein Folge-Kontakt, dann Termin-Datum
+            
             # Wenn keine Folge-Kontakte, dann bleibt es bei "Termin vereinbart"
             if len(folge_kontakte) == 0:
                 folge_kontakte = ['Kein weiterer Kontakt']
@@ -57,7 +65,10 @@ if uploaded_file is not None:
             results.append({
                 'Mitarbeiterin': mitarbeiterin,
                 'Kunde': kunde,
+                'PLZ': plz,
+                'Ort': ort,
                 'Termin Datum': termin_datum,
+                'Letzter Kontakt Datum': letzter_kontakt_datum,
                 'Termin Art': termin_art,
                 'Folge-Kontakte': ' → '.join(folge_kontakte),
                 'Anzahl Folge-Kontakte': len(folge_kontakte),
@@ -178,10 +189,11 @@ if uploaded_file is not None:
         # Download Button für alle Daten ganz oben
         all_data_csv = results_df.copy()
         all_data_csv['Termin Datum'] = all_data_csv['Termin Datum'].dt.strftime('%Y-%m-%d %H:%M')
+        all_data_csv['Letzter Kontakt Datum'] = all_data_csv['Letzter Kontakt Datum'].dt.strftime('%Y-%m-%d %H:%M')
         
         st.download_button(
             label="📥 Gesamte Tabelle als CSV downloaden",
-            data=all_data_csv.to_csv(index=False).encode('utf-8'),
+            data=all_data_csv[['Mitarbeiterin', 'Kunde', 'PLZ', 'Ort', 'Termin Datum', 'Letzter Kontakt Datum', 'Termin Art', 'Folge-Kontakte', 'Letzter Status']].to_csv(index=False).encode('utf-8'),
             file_name=f'termin_analyse_gesamt_{datetime.now().strftime("%Y%m%d")}.csv',
             mime='text/csv'
         )
@@ -205,10 +217,11 @@ if uploaded_file is not None:
                 # Datum formatieren
                 ma_df_display = ma_df.copy()
                 ma_df_display['Termin Datum'] = ma_df_display['Termin Datum'].dt.strftime('%Y-%m-%d %H:%M')
+                ma_df_display['Letzter Kontakt Datum'] = ma_df_display['Letzter Kontakt Datum'].dt.strftime('%Y-%m-%d %H:%M')
                 
                 # Tabelle
                 st.dataframe(
-                    ma_df_display[['Kunde', 'Termin Datum', 'Termin Art', 'Folge-Kontakte', 'Letzter Status']],
+                    ma_df_display[['Kunde', 'PLZ', 'Ort', 'Termin Datum', 'Letzter Kontakt Datum', 'Termin Art', 'Folge-Kontakte', 'Letzter Status']],
                     hide_index=True,
                     use_container_width=True
                 )
@@ -216,7 +229,7 @@ if uploaded_file is not None:
                 # Download für diese Mitarbeiterin
                 st.download_button(
                     label=f"📥 {mitarbeiterin} als CSV downloaden",
-                    data=ma_df_display.to_csv(index=False).encode('utf-8'),
+                    data=ma_df_display[['Mitarbeiterin', 'Kunde', 'PLZ', 'Ort', 'Termin Datum', 'Letzter Kontakt Datum', 'Termin Art', 'Folge-Kontakte', 'Letzter Status']].to_csv(index=False).encode('utf-8'),
                     file_name=f'termin_analyse_{mitarbeiterin}_{datetime.now().strftime("%Y%m%d")}.csv',
                     mime='text/csv',
                     key=f'download_{mitarbeiterin}'  # Unique key für jeden Button
