@@ -109,6 +109,69 @@ if uploaded_file is not None:
         
         st.markdown("---")
         
+        # --- ERWEITERTE STATISTIK PRO MITARBEITERIN ---
+        st.markdown("## 📊 Statistik pro Mitarbeiterin")
+        
+        # Sortiert nach Anzahl Termine
+        mitarbeiterinnen_sorted = results_df['Mitarbeiterin'].value_counts().index.tolist()
+        
+        for mitarbeiterin in mitarbeiterinnen_sorted:
+            ma_df = results_df[results_df['Mitarbeiterin'] == mitarbeiterin].copy()
+            
+            anzahl_termine = len(ma_df)
+            
+            # Zähle alle verschiedenen "Letzten Status"
+            status_counts = ma_df['Letzter Status'].value_counts().to_dict()
+            
+            # Container für diese Mitarbeiterin
+            st.markdown(f"### **{mitarbeiterin}**")
+            st.markdown(f"**Termine vereinbart: {anzahl_termine}x**")
+            
+            # Status-Liste sortiert (Auftrag zuerst, dann alphabetisch)
+            status_items = sorted(status_counts.items(), key=lambda x: (
+                0 if 'auftrag' in x[0].lower() else 1,  # Aufträge zuerst
+                -x[1]  # Dann nach Anzahl absteigend
+            ))
+            
+            # Emoji-Mapping
+            emoji_map = {
+                'Kein weiterer Kontakt': '😔',
+                'Auftrag': '🎉',
+                'Verkaufsgespräch': '💼',
+                'Telefonat': '📞',
+                'nicht erreicht': '📵',
+                'nicht anwesend': '🚫',
+                'abgesagt': '❌',
+                'Servicetermin': '🔧'
+            }
+            
+            # Ausgabe der Status
+            for status, count in status_items:
+                # Emoji finden
+                emoji = '📌'
+                for key, em in emoji_map.items():
+                    if key.lower() in status.lower():
+                        emoji = em
+                        break
+                
+                # Wenn Auftrag → fett und grün
+                if 'auftrag' in status.lower():
+                    st.markdown(f"   **:green[→ {emoji} {status}: {count}x]** 🎯")
+                # Wenn "kein weiterer Kontakt" → rot
+                elif status == 'Kein weiterer Kontakt':
+                    st.markdown(f"   :red[→ {emoji} {status}: {count}x]")
+                # Alle anderen normal
+                else:
+                    st.markdown(f"   → {emoji} {status}: {count}x")
+            
+            # Conversion Rate berechnen
+            auftraege = sum([v for k, v in status_counts.items() if 'auftrag' in k.lower()])
+            if anzahl_termine > 0:
+                conversion_rate = (auftraege / anzahl_termine) * 100
+                st.markdown(f"   **Conversion Rate: {conversion_rate:.1f}%** (Aufträge / Termine)")
+            
+            st.markdown("---")
+        
         # --- DETAIL TABELLEN PRO MITARBEITERIN ---
         st.markdown("## 📋 Detail-Tabellen pro Mitarbeiterin")
         
