@@ -2,10 +2,13 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
+VERSION = "1.2"
+
 st.set_page_config(page_title="EDELWEISS Termin-Analyse", layout="wide")
 
 # Titel
 st.title("📊 EDELWEISS Termin-Analyse")
+st.caption(f"Version {VERSION}")
 st.markdown("---")
 
 # File Upload
@@ -55,10 +58,22 @@ if uploaded_file is not None:
             # Datum vom letzten Kontakt + Verkäufer vom letzten Kontakt
             if len(kunde_kontakte) > 0:
                 letzter_kontakt_datum = kunde_kontakte.iloc[-1]['Datum/Uhrzeit']
-                letzter_verkaeufer = kunde_kontakte.iloc[-1].get('Kontaktbericht für', '')
+                # Robust: mehrere Varianten des Spaltennamens prüfen
+                if 'Kontaktbericht für' in kunde_kontakte.columns:
+                    letzter_verkaeufer = kunde_kontakte.iloc[-1]['Kontaktbericht für']
+                elif 'Kontaktbericht fuer' in kunde_kontakte.columns:
+                    letzter_verkaeufer = kunde_kontakte.iloc[-1]['Kontaktbericht fuer']
+                else:
+                    letzter_verkaeufer = ''
             else:
                 letzter_kontakt_datum = termin_datum  # Wenn kein Folge-Kontakt, dann Termin-Datum
-                letzter_verkaeufer = termin_row.get('Kontaktbericht für', '')  # Verkäufer vom Termin
+                # Verkäufer vom Termin
+                if 'Kontaktbericht für' in df.columns:
+                    letzter_verkaeufer = termin_row['Kontaktbericht für']
+                elif 'Kontaktbericht fuer' in df.columns:
+                    letzter_verkaeufer = termin_row['Kontaktbericht fuer']
+                else:
+                    letzter_verkaeufer = ''
             
             # Wenn keine Folge-Kontakte, dann bleibt es bei "Termin vereinbart"
             if len(folge_kontakte) == 0:
@@ -71,7 +86,7 @@ if uploaded_file is not None:
                 'Ort': ort,
                 'Termin Datum': termin_datum,
                 'Letzter Kontakt Datum': letzter_kontakt_datum,
-                'Letzter Verkäufer': letzter_verkaeufer,
+                'Verkäufer': letzter_verkaeufer,
                 'Termin Art': termin_art,
                 'Folge-Kontakte': ' → '.join(folge_kontakte),
                 'Anzahl Folge-Kontakte': len(folge_kontakte),
@@ -196,7 +211,7 @@ if uploaded_file is not None:
         
         st.download_button(
             label="📥 Gesamte Tabelle als CSV downloaden",
-            data=all_data_csv[['Mitarbeiterin', 'Kunde', 'PLZ', 'Ort', 'Termin Datum', 'Letzter Kontakt Datum', 'Letzter Verkäufer', 'Termin Art', 'Folge-Kontakte', 'Letzter Status']].to_csv(index=False).encode('utf-8'),
+            data=all_data_csv[['Mitarbeiterin', 'Kunde', 'PLZ', 'Ort', 'Termin Datum', 'Letzter Kontakt Datum', 'Verkäufer', 'Termin Art', 'Folge-Kontakte', 'Letzter Status']].to_csv(index=False).encode('utf-8'),
             file_name=f'termin_analyse_gesamt_{datetime.now().strftime("%Y%m%d")}.csv',
             mime='text/csv'
         )
@@ -224,7 +239,7 @@ if uploaded_file is not None:
                 
                 # Tabelle
                 st.dataframe(
-                    ma_df_display[['Kunde', 'PLZ', 'Ort', 'Termin Datum', 'Letzter Kontakt Datum', 'Letzter Verkäufer', 'Termin Art', 'Folge-Kontakte', 'Letzter Status']],
+                    ma_df_display[['Kunde', 'PLZ', 'Ort', 'Termin Datum', 'Letzter Kontakt Datum', 'Verkäufer', 'Termin Art', 'Folge-Kontakte', 'Letzter Status']],
                     hide_index=True,
                     use_container_width=True
                 )
@@ -232,7 +247,7 @@ if uploaded_file is not None:
                 # Download für diese Mitarbeiterin
                 st.download_button(
                     label=f"📥 {mitarbeiterin} als CSV downloaden",
-                    data=ma_df_display[['Mitarbeiterin', 'Kunde', 'PLZ', 'Ort', 'Termin Datum', 'Letzter Kontakt Datum', 'Letzter Verkäufer', 'Termin Art', 'Folge-Kontakte', 'Letzter Status']].to_csv(index=False).encode('utf-8'),
+                    data=ma_df_display[['Mitarbeiterin', 'Kunde', 'PLZ', 'Ort', 'Termin Datum', 'Letzter Kontakt Datum', 'Verkäufer', 'Termin Art', 'Folge-Kontakte', 'Letzter Status']].to_csv(index=False).encode('utf-8'),
                     file_name=f'termin_analyse_{mitarbeiterin}_{datetime.now().strftime("%Y%m%d")}.csv',
                     mime='text/csv',
                     key=f'download_{mitarbeiterin}'  # Unique key für jeden Button
@@ -245,16 +260,19 @@ else:
     ### Anleitung
     
     1. **Excel-Datei hochladen** mit folgenden Spalten:
-       - `Mitarbeiter`
-       - `Kontaktart`
+       - `Mitarbeiter` (wer den Termin vereinbart hat)
+       - `Kontaktart` (enthält z.B. "Termin vereinbart")
        - `Kontakt` (Kundenname)
        - `Datum/Uhrzeit`
+       - `Kontaktbericht für` (wird als "Verkäufer" angezeigt)
+       - `PLZ (Firma)` und `Ort (Firma)` (optional)
     
     2. Die App findet automatisch alle **"Termin vereinbart"** Einträge
     
     3. Auswertung zeigt:
        - Welche Mitarbeiterin den ersten Termin vereinbart hat
        - Was danach mit dem Kunden passiert ist
-       - Customer Journey als Sankey-Diagramm
-       - Detail-Tabelle mit allen Daten
+       - Wer der letzte Verkäufer in der Kette war
+       - Statistiken pro Mitarbeiterin
+       - Detail-Tabellen mit allen Daten
     """)
