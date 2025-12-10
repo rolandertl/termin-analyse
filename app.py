@@ -52,11 +52,13 @@ if uploaded_file is not None:
             # Folge-Kontaktarten sammeln
             folge_kontakte = kunde_kontakte['Kontaktart'].tolist()
             
-            # Datum vom letzten Kontakt
+            # Datum vom letzten Kontakt + Verkäufer vom letzten Kontakt
             if len(kunde_kontakte) > 0:
                 letzter_kontakt_datum = kunde_kontakte.iloc[-1]['Datum/Uhrzeit']
+                letzter_verkaeufer = kunde_kontakte.iloc[-1].get('Kontaktbericht für', '')
             else:
                 letzter_kontakt_datum = termin_datum  # Wenn kein Folge-Kontakt, dann Termin-Datum
+                letzter_verkaeufer = termin_row.get('Kontaktbericht für', '')  # Verkäufer vom Termin
             
             # Wenn keine Folge-Kontakte, dann bleibt es bei "Termin vereinbart"
             if len(folge_kontakte) == 0:
@@ -69,6 +71,7 @@ if uploaded_file is not None:
                 'Ort': ort,
                 'Termin Datum': termin_datum,
                 'Letzter Kontakt Datum': letzter_kontakt_datum,
+                'Letzter Verkäufer': letzter_verkaeufer,
                 'Termin Art': termin_art,
                 'Folge-Kontakte': ' → '.join(folge_kontakte),
                 'Anzahl Folge-Kontakte': len(folge_kontakte),
@@ -193,7 +196,7 @@ if uploaded_file is not None:
         
         st.download_button(
             label="📥 Gesamte Tabelle als CSV downloaden",
-            data=all_data_csv[['Mitarbeiterin', 'Kunde', 'PLZ', 'Ort', 'Termin Datum', 'Letzter Kontakt Datum', 'Termin Art', 'Folge-Kontakte', 'Letzter Status']].to_csv(index=False).encode('utf-8'),
+            data=all_data_csv[['Mitarbeiterin', 'Kunde', 'PLZ', 'Ort', 'Termin Datum', 'Letzter Kontakt Datum', 'Letzter Verkäufer', 'Termin Art', 'Folge-Kontakte', 'Letzter Status']].to_csv(index=False).encode('utf-8'),
             file_name=f'termin_analyse_gesamt_{datetime.now().strftime("%Y%m%d")}.csv',
             mime='text/csv'
         )
@@ -221,7 +224,7 @@ if uploaded_file is not None:
                 
                 # Tabelle
                 st.dataframe(
-                    ma_df_display[['Kunde', 'PLZ', 'Ort', 'Termin Datum', 'Letzter Kontakt Datum', 'Termin Art', 'Folge-Kontakte', 'Letzter Status']],
+                    ma_df_display[['Kunde', 'PLZ', 'Ort', 'Termin Datum', 'Letzter Kontakt Datum', 'Letzter Verkäufer', 'Termin Art', 'Folge-Kontakte', 'Letzter Status']],
                     hide_index=True,
                     use_container_width=True
                 )
@@ -229,7 +232,7 @@ if uploaded_file is not None:
                 # Download für diese Mitarbeiterin
                 st.download_button(
                     label=f"📥 {mitarbeiterin} als CSV downloaden",
-                    data=ma_df_display[['Mitarbeiterin', 'Kunde', 'PLZ', 'Ort', 'Termin Datum', 'Letzter Kontakt Datum', 'Termin Art', 'Folge-Kontakte', 'Letzter Status']].to_csv(index=False).encode('utf-8'),
+                    data=ma_df_display[['Mitarbeiterin', 'Kunde', 'PLZ', 'Ort', 'Termin Datum', 'Letzter Kontakt Datum', 'Letzter Verkäufer', 'Termin Art', 'Folge-Kontakte', 'Letzter Status']].to_csv(index=False).encode('utf-8'),
                     file_name=f'termin_analyse_{mitarbeiterin}_{datetime.now().strftime("%Y%m%d")}.csv',
                     mime='text/csv',
                     key=f'download_{mitarbeiterin}'  # Unique key für jeden Button
